@@ -1,4 +1,4 @@
-from defusedxml.ElementTree import parse, ParseError
+from defusedxml.ElementTree import parse
 
 
 def dictfetchall(cursor):

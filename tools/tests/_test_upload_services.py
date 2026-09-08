@@ -1,7 +1,6 @@
 from unittest.mock import patch
 from tempfile import TemporaryFile
 
-from core import filter_validity
 from core.test_helpers import create_test_interactive_user
 from django.core.exceptions import ObjectDoesNotExist
 from django.test import TestCase
@@ -811,7 +810,7 @@ class UploadServicesParseXMLServicesTestCase(TestCase):
 class UploadServicesParseOptionalFieldsTestCase(TestCase):
 
     def test_parse_optional_service_fields_all_empty(self):
-        xml = f"""
+        xml = """
             <Service>
                 <ServiceCategory/>
                 <ServiceFrequency/>
@@ -829,7 +828,7 @@ class UploadServicesParseOptionalFieldsTestCase(TestCase):
             self.assertFalse(error)
 
     def test_parse_optional_service_fields_all_filled(self):
-        xml = f"""
+        xml = """
             <Service>
                 <ServiceCategory>O</ServiceCategory>
                 <ServiceFrequency>5</ServiceFrequency>
@@ -850,7 +849,7 @@ class UploadServicesParseOptionalFieldsTestCase(TestCase):
             self.assertFalse(error)
 
     def test_parse_optional_service_fields_filled_and_empty_frq(self):
-        xml = f"""
+        xml = """
             <Service>
                 <ServiceCategory/>
                 <ServiceFrequency>78</ServiceFrequency>
@@ -871,7 +870,7 @@ class UploadServicesParseOptionalFieldsTestCase(TestCase):
             self.assertFalse(error)
 
     def test_parse_optional_service_fields_filled_and_empty_cat(self):
-        xml = f"""
+        xml = """
             <Service>
                 <ServiceCategory>o</ServiceCategory>
                 <ServiceFrequency/>
@@ -892,7 +891,7 @@ class UploadServicesParseOptionalFieldsTestCase(TestCase):
             self.assertFalse(error)
 
     def test_parse_optional_service_fields_error_frequency(self):
-        xml = f"""
+        xml = """
             <Service>
                 <ServiceCategory>V</ServiceCategory>
                 <ServiceFrequency>5.55</ServiceFrequency>

@@ -13,8 +13,7 @@ from django.db import connection
 from itertools import chain
 
 from contribution.models import Premium
-from core.utils import filter_validity
-from django.db.models import Manager, Prefetch
+from django.db.models import Manager
 from django.db.models.query_utils import Q
 from django.http import JsonResponse
 from import_export.results import Result
@@ -35,7 +34,7 @@ from core.models.user import ClaimAdmin
 from claim.models import Claim, Feedback, FeedbackPrompt
 from policy.models import Policy
 from policy.services import update_insuree_policies
-from .utils import dictfetchall, sanitize_xml, dmy_format_sql
+from .utils import dictfetchall, sanitize_xml
 from .models import Extract
 import logging
 from dataclasses import dataclass
@@ -107,7 +106,7 @@ def load_diagnoses_xml(xml):
         try:
             code = get_xml_element(elm, "DiagnosisCode")
             name = get_xml_element(elm, "DiagnosisName")
-        except:
+        except AttributeError:
             errors.append("Diagnosis has no code or no name")
             continue
 
@@ -171,17 +170,17 @@ def parse_xml_items(xml):
             male_cat = get_xml_element_int(elm, "ItemMaleCategory")
             female_cat = get_xml_element_int(elm, "ItemFemaleCategory")
 
-        except InvalidXmlInt as parsing_ex:
+        except InvalidXmlInt:
             errors.append(f"Item '{code}': patient categories are invalid. Please use '0' for no or '1' for yes")
             continue
-        except InvalidXmlFloat as parsing_ex:
+        except InvalidXmlFloat:
             errors.append(f"Item '{code}': price is invalid. Please use '.' "
                           f"as decimal separator, without any currency symbol.")
             continue
-        except AttributeError as missing_value_ex:
+        except AttributeError:
             errors.append(
-                f"Item is missing one of the following fields: code, name, type, price, care type, "
-                f"male category, female category, adult category or minor category.")
+                "Item is missing one of the following fields: code, name, type, price, care type, "
+                "male category, female category, adult category or minor category.")
             continue
 
         categories = [adult_cat, minor_cat, male_cat, female_cat]
@@ -256,7 +255,6 @@ def get_xml_element(elm, element_name, default=marker):
 
 class InvalidXmlInt(ValueError):
     """Exception raised when an XML element is not a valid integer."""
-    pass
 
 
 def get_xml_element_int(elm, element_name, default=marker):
@@ -271,7 +269,6 @@ def get_xml_element_int(elm, element_name, default=marker):
 
 class InvalidXmlFloat(ValueError):
     """Exception raised when an XML element is not a valid float."""
-    pass
 
 
 def get_xml_element_float(elm, element_name, default=marker):
@@ -329,9 +326,9 @@ def parse_optional_item_fields(elm, code):
 
         return optional_values, error_message
 
-    except InvalidXmlInt as parsing_ex:
+    except InvalidXmlInt:
         error_message = f"Item '{code}': frequency is invalid. Please enter a non decimal number of days."
-    except InvalidXmlFloat as parsing_ex:
+    except InvalidXmlFloat:
         error_message = f"Item '{code}': quantity is invalid. Please use '.' as decimal separator."
 
     return optional_values, error_message
@@ -382,17 +379,17 @@ def parse_xml_services(xml):
             male_cat = get_xml_element_int(elm, "ServiceMaleCategory")
             female_cat = get_xml_element_int(elm, "ServiceFemaleCategory")
 
-        except InvalidXmlInt as parsing_ex:
+        except InvalidXmlInt:
             errors.append(f"Service '{code}': patient categories are invalid. Please use '0' for no or '1' for yes")
             continue
-        except InvalidXmlFloat as parsing_ex:
+        except InvalidXmlFloat:
             errors.append(f"Service '{code}': price is invalid. Please use '.' "
                           f"as decimal separator, without any currency symbol.")
             continue
-        except AttributeError as missing_value_ex:
+        except AttributeError:
             errors.append(
-                f"Service is missing one of the following fields: code, name, type, level, price, care type, "
-                f"male category, female category, adult category or minor category.")
+                "Service is missing one of the following fields: code, name, type, level, price, care type, "
+                "male category, female category, adult category or minor category.")
             continue
 
         categories = [adult_cat, minor_cat, male_cat, female_cat]
@@ -485,7 +482,7 @@ def parse_optional_service_fields(elm, code):
 
         return optional_values, error_message
 
-    except ValueError as parsing_ex:
+    except ValueError:
         error_message = f"Service '{code}': frequency is invalid. Please enter a non decimal number of days."
 
         return optional_values, error_message
@@ -732,8 +729,8 @@ def get_parent_location(code):
     return Location.objects.filter(code=code, *Location.filter_validity()).first()
 
 
-def __chunk_list(l, size=1000):
-    return (l[index:index + size] for index in range(0, len(l), size))
+def __chunk_list(items, size=1000):
+    return (items[index:index + size] for index in range(0, len(items), size))
 
 
 def upload_locations(user, xml, strategy=STRATEGY_INSERT, dry_run=False):
@@ -967,6 +964,9 @@ def create_master_data_export(user):
         "relations": """SELECT "RelationId", "Relation", "SortOrder", "AltLanguage" FROM "tblRelations";""",
         "phoneDefaults": """SELECT "RuleName", "RuleValue" FROM "tblIMISDefaultsPhone";""",
         "genders": """SELECT "Code", "Gender", "AltLanguage", "SortOrder" FROM "tblGender";""",
+        "ModuleConfiguration": """SELECT "id"::text, "module", "version", "config", TO_CHAR("is_disabled_until", 'yyyy-MM-dd')is_disabled_until, "is_exposed", "layer" FROM "core_ModuleConfiguration" WHERE "layer"='fe' AND "is_exposed" is true;"""
+        if connection.vendor == "postgresql" else
+        """SELECT CAST("id" AS VARCHAR(36)), "module", "version", "config", FORMAT("is_disabled_until", 'yyyy-MM-dd')is_disabled_until, "is_exposed", "layer" FROM "core_ModuleConfiguration" WHERE "layer"='fe' AND "is_exposed" = 'true'""",
     }
 
     results = {}
@@ -1620,13 +1620,13 @@ def upload_feedbacks(archive, user):
                 claim=db_claim,
                 validity_to=None,
                 defaults={
-                    care_rendered: care_rendered,
-                    payment_asked: payment_asked,
-                    drug_prescribed: drug_prescribed,
-                    drug_received: drug_received,
-                    assessment: assessment,
-                    feedback_date: feedback.get("Date"),
-                    audit_user_id: user.id_for_audit,
+                    "care_rendered": care_rendered,
+                    "payment_asked": payment_asked,
+                    "drug_prescribed": drug_prescribed,
+                    "drug_received": drug_received,
+                    "assessment": assessment,
+                    "feedback_date": feedback.get("Date"),
+                    "audit_user_id": user.id_for_audit,
                 }
             )
             if db_feedback_created:

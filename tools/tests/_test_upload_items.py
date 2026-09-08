@@ -1,7 +1,6 @@
 from unittest.mock import patch
 from tempfile import TemporaryFile
 
-from core import filter_validity
 from core.test_helpers import create_test_interactive_user
 from django.core.exceptions import ObjectDoesNotExist
 from django.test import TestCase
@@ -781,7 +780,7 @@ class UploadItemsParseXMLItemsTestCase(TestCase):
 class UploadItemsParseOptionalFieldsTestCase(TestCase):
 
     def test_parse_optional_item_fields_all_empty(self):
-        xml = f"""
+        xml = """
             <Item>
                 <ItemQuantity/>
                 <ItemPackage/>
@@ -800,7 +799,7 @@ class UploadItemsParseOptionalFieldsTestCase(TestCase):
             self.assertFalse(error)
 
     def test_parse_optional_item_fields_all_filled(self):
-        xml = f"""
+        xml = """
             <Item>
                 <ItemPackage>1000 TABLETS</ItemPackage>
                 <ItemQuantity>42.00</ItemQuantity>
@@ -823,7 +822,7 @@ class UploadItemsParseOptionalFieldsTestCase(TestCase):
             self.assertFalse(error)
 
     def test_parse_optional_item_fields_filled_and_empty_frq(self):
-        xml = f"""
+        xml = """
             <Item>
                 <ItemPackage/>
                 <ItemQuantity/>
@@ -846,7 +845,7 @@ class UploadItemsParseOptionalFieldsTestCase(TestCase):
             self.assertFalse(error)
 
     def test_parse_optional_item_fields_filled_and_empty_qty(self):
-        xml = f"""
+        xml = """
             <Item>
                 <ItemPackage/>
                 <ItemQuantity>88.25</ItemQuantity>
@@ -869,7 +868,7 @@ class UploadItemsParseOptionalFieldsTestCase(TestCase):
             self.assertFalse(error)
 
     def test_parse_optional_item_fields_filled_and_empty_pkg(self):
-        xml = f"""
+        xml = """
             <Item>
                 <ItemPackage>Great package</ItemPackage>
                 <ItemQuantity/>
@@ -892,7 +891,7 @@ class UploadItemsParseOptionalFieldsTestCase(TestCase):
             self.assertFalse(error)
 
     def test_parse_optional_item_fields_filled_and_empty_frq_qty(self):
-        xml = f"""
+        xml = """
             <Item>
                 <ItemPackage/>
                 <ItemQuantity>1.25</ItemQuantity>
@@ -915,7 +914,7 @@ class UploadItemsParseOptionalFieldsTestCase(TestCase):
             self.assertFalse(error)
 
     def test_parse_optional_item_fields_filled_and_empty_frq_pkg(self):
-        xml = f"""
+        xml = """
             <Item>
                 <ItemPackage>Nice package</ItemPackage>
                 <ItemQuantity/>
@@ -938,7 +937,7 @@ class UploadItemsParseOptionalFieldsTestCase(TestCase):
             self.assertFalse(error)
 
     def test_parse_optional_item_fields_filled_and_empty_qty_pkg(self):
-        xml = f"""
+        xml = """
             <Item>
                 <ItemPackage>Nice package</ItemPackage>
                 <ItemQuantity>8.99</ItemQuantity>
@@ -961,7 +960,7 @@ class UploadItemsParseOptionalFieldsTestCase(TestCase):
             self.assertFalse(error)
 
     def test_parse_optional_item_fields_error_quantity(self):
-        xml = f"""
+        xml = """
             <Item>
                 <ItemPackage>1000 TABLETS</ItemPackage>
                 <ItemQuantity>42ml</ItemQuantity>
@@ -983,7 +982,7 @@ class UploadItemsParseOptionalFieldsTestCase(TestCase):
             self.assertIn(code, error)
 
     def test_parse_optional_item_fields_error_frequency(self):
-        xml = f"""
+        xml = """
             <Item>
                 <ItemPackage>1000 TABLETS</ItemPackage>
                 <ItemFrequency>5.55</ItemFrequency>
@@ -1005,7 +1004,7 @@ class UploadItemsParseOptionalFieldsTestCase(TestCase):
             self.assertIn(code, error)
 
     def test_parse_optional_item_fields_error_package_too_small(self):
-        xml = f"""
+        xml = """
             <Item>
                 <ItemPackage> </ItemPackage>
                 <ItemFrequency>1</ItemFrequency>

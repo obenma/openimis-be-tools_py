@@ -2,10 +2,9 @@ import os
 from tablib import Dataset
 from core.test_helpers import create_test_interactive_user
 from django.test import TestCase
-from location.test_helpers import create_test_location
-from django.conf import settings
 from medical.test_helpers import create_test_item
 from tools.resources import ItemResource
+
 
 class ImportItemTest(TestCase):
 
@@ -13,6 +12,7 @@ class ImportItemTest(TestCase):
         super(ImportItemTest, self).setUp()
         self.user = create_test_interactive_user()
         create_test_item('S', custom_props={"code": 'SS'})
+
     def test_simple_import(self):
         dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
         resource = ItemResource(user=self.user)
@@ -28,4 +28,3 @@ class ImportItemTest(TestCase):
     def test_simple_export(self):
         result = ItemResource(self.user).export().dict
         self.assertTrue(result)
-

@@ -1,11 +1,17 @@
+import logging
+
+from django.utils.translation import gettext as _
+
 from core import PATIENT_CATEGORY_MASK_MALE, PATIENT_CATEGORY_MASK_FEMALE, PATIENT_CATEGORY_MASK_ADULT, \
-    PATIENT_CATEGORY_MASK_MINOR, filter_validity
+    PATIENT_CATEGORY_MASK_MINOR
 from import_export import resources, fields
 from import_export.fields import Field
 from import_export.widgets import IntegerWidget, BooleanWidget
 
 from medical.models import Item, Service
 from tools.services import validate_imported_item_row, validate_imported_service_row
+
+logger = logging.getLogger(__name__)
 
 
 def process_imported_patient_categories(row):
@@ -84,6 +90,7 @@ class ItemServiceResource(resources.ModelResource):
                                                         saves_null_values=False,
                                                         widget=IntegerWidget())
         super().before_import(dataset, **kwargs)
+
     def before_save_instance(self, instance, row, **kwargs):
         if hasattr(instance, 'audit_user_id'):
             if self._user and self._user._u.id:
@@ -92,19 +99,14 @@ class ItemServiceResource(resources.ModelResource):
                 instance.audit_user_id = -1
                 logger.warning(_("im_export.save_without_user"))
     # This method is called when the user flags a row to be deleted (the "delete" column value is '1')
+
     def for_delete(self, row, instance):
         if "delete" in row:
             return self.fields['delete'].clean(row)
 
-    def __init__(self, user, queryset=None, ):
-        """
-        @param user: User to be used for location rights for import and export, and for audit_user_id
-        @param queryset: Queryset to use for export, Default to full quetyset
-        """
-        super().__init__()
-        self._user = user
-        
 # This class is responsible for customizing the import and export processes
+
+
 class ItemResource(ItemServiceResource):
 
     class Meta:
@@ -112,7 +114,7 @@ class ItemResource(ItemServiceResource):
 
         # These are the fields that are going to get exported/
         fields = ('code', 'name', 'type', 'package', 'price', 'quantity',
-                  'care_type', 'frequency', 'patient_category', 
+                  'care_type', 'frequency', 'patient_category',
                   'male_cat', 'female_cat', 'adult_cat', 'minor_cat')
 
         # You can customize the order for exports, but this order is also used during upload
@@ -142,7 +144,7 @@ class ServiceResource(ItemServiceResource):
 
         # These are the fields that are going to get exported/
         fields = ('code', 'name', 'type', 'level', 'price', 'category',
-                  'care_type', 'frequency', 'patient_category', 
+                  'care_type', 'frequency', 'patient_category',
                   'male_cat', 'female_cat', 'adult_cat', 'minor_cat')
         export_order = fields
 

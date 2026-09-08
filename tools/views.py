@@ -5,7 +5,6 @@ import xml.etree.ElementTree as ET
 
 from core.models import Officer
 from core.security import checkUserWithRights
-from core.utils import filter_validity
 from django.core.exceptions import PermissionDenied
 from django.db.models.query_utils import Q
 from django.http import HttpResponse
@@ -28,8 +27,6 @@ from .resources import ItemResource, ServiceResource
 from .services import return_upload_result_json
 
 logger = logging.getLogger(__name__)
-
-
 
 
 @api_view(["GET"])
@@ -161,7 +158,6 @@ def upload_health_facilities(request):
                 "error": str(exc),
             }
         )
-
 
 
 @api_view(["GET"])
@@ -432,6 +428,7 @@ def download_feedbacks(request):
 
     return response
 
+
 @api_view(["GET"])
 def download_renewals(request):
     if not request.user.has_perms(ToolsConfig.extracts_officer_renewals_perms):
@@ -612,7 +609,7 @@ def import_items(request):
     serializer.is_valid(raise_exception=True)
 
     file = serializer.validated_data.get("file")
-    logger.info("User (audit id %s) requested import of medical items",request.user.id_for_audit)
+    logger.info("User (audit id %s) requested import of medical items", request.user.id_for_audit)
 
     item_resource = ItemResource(user=request.user)
     dataset = Dataset()

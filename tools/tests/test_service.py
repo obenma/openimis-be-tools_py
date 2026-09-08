@@ -2,14 +2,12 @@ import os
 from tablib import Dataset
 from core.test_helpers import create_test_interactive_user
 from django.test import TestCase
-from location.test_helpers import create_test_location
-from django.conf import settings
 from tools.resources import ServiceResource
 from medical.test_helpers import create_test_service
 
 
 class ImportServiceTest(TestCase):
-    
+
     def setUp(self) -> None:
         super(ImportServiceTest, self).setUp()
         self.user = create_test_interactive_user()
@@ -31,4 +29,3 @@ class ImportServiceTest(TestCase):
     def test_simple_export(self):
         result = ServiceResource(self.user).export().dict
         self.assertTrue(result)
-
