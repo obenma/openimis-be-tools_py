@@ -1245,55 +1245,123 @@ def create_phone_extract(user, location_id, with_insuree=False):
     return extract
 
 
-def upload_claim(user, xml):
-    logger.info(f"Uploading claim with user {user.id}")
+def _claim_element(xml):
+    # A claim file's root element is <Claim>; older callers wrap it in another root.
+    root = xml.getroot() if hasattr(xml, "getroot") else xml
+    return root if root.tag == "Claim" else root.find("Claim")
 
+
+def _xml_text(element, tag):
+    value = element.findtext(tag) if element is not None else None
+    return value.strip() if value and value.strip() else None
+
+
+def _xml_date(element, tag):
+    value = _xml_text(element, tag)
+    if not value:
+        return None
+    try:
+        return datetime.datetime.strptime(value, "%d/%m/%Y").date()
+    except ValueError:
+        raise InvalidXMLError(f"Invalid date in {tag}: {value}")
+
+
+def _xml_decimal(element, tag):
+    value = _xml_text(element, tag)
+    try:
+        return decimal.Decimal(value) if value else None
+    except decimal.InvalidOperation:
+        raise InvalidXMLError(f"Invalid number in {tag}: {value}")
+
+
+def _claim_details(claim_element, xml_tag, model, error):
+    details = []
+    container = claim_element.find(f"{xml_tag}s")
+    for element in container.findall(xml_tag) if container is not None else []:
+        code = _xml_text(element, f"{xml_tag}Code")
+        medical = model.objects.filter(code=code, validity_to__isnull=True).first() if code else None
+        if not medical:
+            raise InvalidXMLError(error)
+        details.append({
+            f"{xml_tag.lower()}_id": medical.id,
+            "qty_provided": _xml_decimal(element, f"{xml_tag}Quantity"),
+            "price_asked": _xml_decimal(element, f"{xml_tag}Price"),
+        })
+    return details
+
+
+def upload_claim(user, xml):
+    """
+    Enter the claim of a claim XML file (Tools > Extracts > Upload Claims, mobile claim sync)
+    through claim.services.ClaimCreateService, the path of the GraphQL and FHIR claim creation.
+    Raises InvalidXMLError with the reasons the former uspUpdateClaimFromPhone returned.
+    """
+    from claim.services import ClaimCreateService
+
+    logger.info(f"Uploading claim with user {user.id}")
+    claim_element = _claim_element(xml)
+    details = claim_element.find("Details") if claim_element is not None else None
+    if details is None:
+        raise InvalidXMLError("Missing Claim/Details")
+
+    hf_code = _xml_text(details, "HFCode")
     if settings.ROW_SECURITY:
         logger.info("Check that user can upload claims in claims' health facilities")
-        hf_code = xml.find("Claim").find("Details").find("HFCode").text
         hfs = LocationManager().build_user_location_filter_query(
             user._u, queryset=HealthFacility.filter_queryset().filter(code=hf_code), loc_types=['D'])
         if len(hfs) < 1:
             raise InvalidXMLError(
                 f"User cannot upload claims for health facility {hf_code}"
             )
+    health_facility = HealthFacility.objects.filter(code=hf_code, validity_to__isnull=True).first()
+    if not health_facility:
+        raise InvalidXMLError("Health facility invalid.")
 
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            DECLARE @ret int;
-            EXEC @ret = [dbo].[uspUpdateClaimFromPhone] @XML = %s, @ByPassSubmit = 1;
-            SELECT @ret;
-        """,
-            (ElementTree.tostring(xml),),
-        )
-        # We have to take the second result set. That's the one that contains the results
-        cursor.nextset()
-        cursor.nextset()
-        if cursor.description is None:
-            return
-        res = cursor.fetchone()[0]
+    admin_code = _xml_text(details, "ClaimAdmin")
+    admin = ClaimAdmin.objects.filter(code=admin_code, validity_to__isnull=True).first() if admin_code else None
+    if admin_code and not admin:
+        raise InvalidXMLError("Unknown claim admin code")
 
-        if res == 0:
-            return True
-        elif res == 1:
-            raise InvalidXMLError("Health facility invalid.")
-        elif res == 2:
-            raise InvalidXMLError("Duplicated claim code")
-        elif res == 3:
-            raise InvalidXMLError("Unknown insuree number")
-        elif res == 4:
-            raise InvalidXMLError("Invalid end date")
-        elif res == 5:
-            raise InvalidXMLError("Unknown diagnosis code")
-        elif res == 7:
-            raise InvalidXMLError("Unknown medical item code")
-        elif res == 8:
-            raise InvalidXMLError("Unknown medical service code")
-        elif res == 9:
-            raise InvalidXMLError("Unknown claim admin code")
-        elif res == -1:
-            raise InvalidXMLError("Unknown error occurred")
+    chf_id = _xml_text(details, "CHFID")
+    insuree = Insuree.objects.filter(chf_id=chf_id, validity_to__isnull=True).first() if chf_id else None
+    if not insuree:
+        raise InvalidXMLError("Unknown insuree number")
+
+    date_from = _xml_date(details, "StartDate")
+    date_to = _xml_date(details, "EndDate") or date_from
+    if date_from and date_to < date_from:
+        raise InvalidXMLError("Invalid end date")
+
+    claim = {
+        "code": _xml_text(details, "ClaimCode"),
+        "health_facility_id": health_facility.id,
+        "admin_id": admin.id if admin else None,
+        "insuree_id": insuree.id,
+        "date_claimed": _xml_date(details, "ClaimDate"),
+        "date_from": date_from,
+        "date_to": date_to,
+        "visit_type": _xml_text(details, "VisitType"),
+        "explanation": _xml_text(details, "Comment"),
+        "guarantee_id": _xml_text(details, "GuaranteeNo"),
+    }
+    for tag, field in (("ICDCode", "icd_id"), ("ICDCode1", "icd_1_id"), ("ICDCode2", "icd_2_id"),
+                       ("ICDCode3", "icd_3_id"), ("ICDCode4", "icd_4_id")):
+        icd_code = _xml_text(details, tag)
+        if icd_code:
+            diagnosis = Diagnosis.objects.filter(code=icd_code, validity_to__isnull=True).first()
+            if not diagnosis:
+                raise InvalidXMLError("Unknown diagnosis code")
+            claim[field] = diagnosis.id
+    claim["items"] = _claim_details(claim_element, "Item", Item, "Unknown medical item code")
+    claim["services"] = _claim_details(claim_element, "Service", Service, "Unknown medical service code")
+
+    if Claim.objects.filter(code=claim["code"], validity_to__isnull=True).exists():
+        raise InvalidXMLError("Duplicated claim code")
+    try:
+        ClaimCreateService(user).enter_claim({k: v for k, v in claim.items() if v is not None})
+    except ValidationError as exc:
+        raise InvalidXMLError("; ".join(exc.messages))
+    return True
 
 
 def open_offline_archive(archive: str, password: str = None):
