@@ -43,6 +43,20 @@ class Extract(core_models.VersionedModel):
     audit_user_id = models.IntegerField(db_column="AuditUserID")
     stored_file = models.FileField(upload_to="extracts/%Y/%m/", db_column="ExtractFile")
 
+    # `Extract` is only written by `services.create_phone_extract`: it is the model of
+    # the `phoneExtract` entity and of no other. The other exports (`master_data`,
+    # `officer_renewals`, `officer_feedbacks`) return a file without leaving a row, and
+    # the registers bear on models of `medical` and `location`.
+    #
+    # No `scope_parent`: the two FKs (`location`, `health_facility`) describe the scope
+    # of the extraction, not an owner from which `Extract` would inherit its rights - a
+    # phone extract is not a sub-resource of a location.
+    @classmethod
+    def get_rights(cls, action):
+        from tools.apps import configured_perms
+
+        return configured_perms("phoneExtract", action)
+
     class Meta:
         managed = True
         db_table = "tblExtracts"

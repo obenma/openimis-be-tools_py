@@ -462,7 +462,7 @@ def upload_claims(request):
             logger.info(f"Processing claim in {filename}")
             xml = utils.sanitize_xml(request.FILES[filename])
             services.upload_claim(request.user, xml)
-        except (utils.ParseError, services.InvalidXMLError) as exc:
+        except (ET.ParseError, services.InvalidXMLError) as exc:
             logger.exception(exc)
             errors.append(f"File '{filename}' is not a valid XML")
             continue
@@ -536,7 +536,7 @@ def _process_upload(request, process_method):
                     tmp_file.write(chunk)
                 tmp_file.seek(0)
                 process_method(tmp_file.name, request.user)
-        except (utils.ParseError, services.InvalidXMLError) as exc:
+        except (ET.ParseError, services.InvalidXMLError) as exc:
             logger.exception(exc)
             errors.append(f"File '{filename}' is not a valid XML")
             continue
